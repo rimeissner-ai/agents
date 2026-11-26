@@ -33,18 +33,18 @@ The skill is **resumable**: every run works out the current state (Step 2) and d
    - Confirm the detected mode.
    - **PR strategy**:
      - **Merge each**: every phase PR targets `main`. A phase starts once the phases it depends on are merged. Independent phases run in parallel.
-     - **Stacked**: every phase PR targets the previous phase's branch. Phases run one after another. The next phase starts once the previous one passed review (web) or was committed by the user (local), without waiting for a merge.
+     - **Stacked**: every phase PR targets the previous phase's branch. Phases run one after another. The next phase starts once the user approved the previous phase's PR (web) or committed it (local), without waiting for a merge. Your own review-pr pass or an open PR is not enough.
    - Web: confirm you may push branches named `epic/<feature>/plan` and `epic/<feature>/phase-<N>`.
 3. Record the strategy in the epic file's header (`PR strategy: merge each` / `PR strategy: stacked`). If an epic already exists and has it, don't ask again.
 
 ## Step 2 — Determine the state
 
 1. Find the epic file under `epics/` (on `main`, or in an open PR / `epic/<feature>/plan` branch).
-2. If there is none → Step 3. If it is not on `main` yet → the plan awaits approval: tell the user and stop.
-3. Otherwise build the phase status table as described in implement-phase Step 2. Statuses: `not started`, `in progress` (branch or worktree exists, no PR), `in review` (PR open), `merged`.
+2. If there is none → Step 3. If it is not on `main` yet → the plan awaits approval: tell the user and stop. Stacked (web): an approved plan PR is enough to continue.
+3. Otherwise build the phase status table as described in implement-phase Step 2. Statuses: `not started`, `in progress` (branch or worktree exists, no PR), `in review` (PR open), `approved` (PR approved by the user, not merged), `merged`.
 4. Pick the phases to start now:
    - **Merge each**: `not started` phases whose dependencies are `merged`.
-   - **Stacked**: the first `not started` phase, if the phase below it is reviewed (web: PR open) or committed (local).
+   - **Stacked**: the first `not started` phase, if the phase below it (or the plan) is `approved` by the user (web) or committed (local).
 5. Nothing to start and nothing in progress → if every phase is merged, go to Step 7; else tell the user what you are waiting for and stop.
 
 ## Step 3 — Plan the epic
@@ -55,7 +55,7 @@ The skill is **resumable**: every run works out the current state (Step 2) and d
 4. Propose the plan:
    - **Web**: commit to `epic/<feature>/plan`, push, open a PR (title and description from propose-pr), watch its activity (Step 6). Address review comments yourself.
    - **Local**: leave the change uncommitted. Show the propose-pr title and description, and ask the user to commit (signed), push and open the PR.
-5. **Stop.** No phase starts before the user merged the plan PR.
+5. **Stop.** No phase starts before the user merged the plan PR (stacked, web: approved it).
 
 ## Step 4 — Start the phase agents
 
@@ -83,7 +83,7 @@ When a phase agent is done:
 1. In its worktree, run review-pr with `--base <base>`. Local: it reviews the uncommitted changes.
 2. If there are 🔴 or 🟠 findings, send them to the phase agent to fix (web: amend the phase commit), then review again. After 2 rounds, ask the user how to proceed.
 3. Then:
-   - **Web**: push the branch, open the PR against `<base>` (title and description from propose-pr), watch its activity (Step 6). Stacked: continue with Step 2 to start the next phase.
+   - **Web**: push the branch, open the PR against `<base>` (title and description from propose-pr), watch its activity (Step 6). Stacked: wait until the user approves this PR before starting the next phase (Step 6).
    - **Local**: show the user the worktree path, the review result, the propose-pr title and description, and a commit message. Ask them to review, commit (signed), push and open the PR, then run this skill again.
 
 ## Step 6 — Follow the PRs (web)
@@ -91,7 +91,7 @@ When a phase agent is done:
 If you can subscribe to PR activity, do so. Otherwise ask the user to run this skill again when there are comments, failing CI or a merge. On PR activity:
 
 - **Review comments or failing CI** → send them to the phase agent to amend the phase commit. If it is gone (e.g. after a restart), start a new phase agent (`model: "sonnet"`) in that branch's worktree with the comments and the phase. Review its changes (Step 5.1) before force-pushing.
-- **Merged** → go to Step 2 and start the phases that are now unblocked.
+- **Approved** (stacked) or **merged** → go to Step 2 and start the phases that are now unblocked.
 - **Stacked, a lower PR changed** → rebase each branch above it onto its updated parent, bottom up (`git rebase --onto <parent branch> <old parent commit>`), resolve conflicts, force-push. If the user merged a lower PR, rebase the next branch onto `main` and retarget its PR to `main`.
 
 ## Step 7 — Finish
